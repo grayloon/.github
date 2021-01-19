@@ -1,4 +1,5 @@
-other_links:
+blank_issues_enabled: false
+contact_links:
   - name: General Questions & Discussions
     url: https://launchpad.37signals.com/
     about: 'GitHub is only for actionable tasks. If you have a question, please open a Basecamp thread:'
