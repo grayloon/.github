@@ -27,6 +27,7 @@ Steps to reproduce the behavior:
 <!-- If applicable, add screenshots to help explain your problem. -->
 
 ## Desktop (if applicable): 
+<!-- See: https://supportdetails.com/ -->
 <!-- please complete the following information) -->
  - OS:            <!-- [e.g. iOS, mac, windows] -->
  - Browser:       <!-- [e.g. chrome, safari]    -->
@@ -34,6 +35,7 @@ Steps to reproduce the behavior:
  - Browser Window Size:    <!-- Optional - if relevant -->
 
 ## Smartphone (if applicable):
+<!-- See: https://supportdetails.com/ -->
 <!-- please complete the following information -->
  - Device:                 <!-- [e.g. iPhone6] -->
  - OS:                     <!--  [e.g. iOS8.1] -->
