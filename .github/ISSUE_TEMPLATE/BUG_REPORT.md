@@ -6,33 +6,34 @@ labels: 'bug'
 assignees: ''
 ---
 
-**Job #:**
+## Job Number
 <!-- What is the C&P Job Number? --->
 
-**Describe the Bug**
+## Describe the Bug
 A clear and concise description of what the bug is.
 
-**To Reproduce**
+### To Reproduce
+
 Steps to reproduce the behavior:
 1. Go to '...'
 2. Click on '....'
 3. Scroll down to '....'
 4. See error
 
-**Expected behavior**
+## Expected behavior
 <!-- A clear and concise description of what you expected to happen. -->
 
-**Screenshots**
+## Screenshots
 <!-- If applicable, add screenshots to help explain your problem. -->
 
-## Desktop: 
+## Desktop (if applicable): 
 <!-- please complete the following information) -->
  - OS:            <!-- [e.g. iOS, mac, windows] -->
  - Browser:       <!-- [e.g. chrome, safari]    -->
  - Version:       <!-- [e.g. 22]                -->
  - Browser Window Size:    <!-- Optional - if relevant -->
 
-## Smartphone:
+## Smartphone (if applicable):
 <!-- please complete the following information -->
  - Device:                 <!-- [e.g. iPhone6] -->
  - OS:                     <!--  [e.g. iOS8.1] -->
@@ -40,4 +41,4 @@ Steps to reproduce the behavior:
  - Version:                <!-- [e.g. 22] -->
 
 ## Additional Context:
-<!-- Add any other context about the problem here. -->
+<!-- Add any other context or links about the problem here. -->
