@@ -12,7 +12,7 @@ assignees: ''
 ## Describe the feature request:
 <!-- A clear and concise description of what you want to happen. -->
 
-## Does this need an estimate or is the work ready to begin?
+## Approved Estimate
 <!-- If the project has been provided an estimate, please provide the estimate hours. -->
 
 ## Additional Information
