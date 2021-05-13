@@ -29,8 +29,8 @@ assignees: ''
 <!-- Provide a clear and concise description of the expected behavior. -->
 
 ### 7. Additional Context
-<!-- Please provide as much detail as possible in order for the developer to successfully close this issue. Some things that may help: -->
 <!-- 
+Please provide as much detail as possible in order for the developer to successfully close this issue. Some things that may help:
 * Support details if OS/Browser specific (https://supportdetails.com)
 * Screen snapshots of visual problems
 * Error messages displayed
