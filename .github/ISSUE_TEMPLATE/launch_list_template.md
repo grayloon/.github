@@ -1,7 +1,7 @@
 ---
 name: Launch List
-about: Default launch list issue.
-title: ''
+about: Create a launch list issue.
+title: 'Launch List'
 labels: ''
 assignees: ''
 ---
