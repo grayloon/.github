@@ -12,6 +12,7 @@ assignees: ''
 Please provide the C+P Job Number.
 
 ### 2. Issue Severity
+To check an item, replace '[ ]' with '[x]'.
 - [ ] Update required (complete 3 and 4).
 - [ ] New feature or addition needed (complete 3 and 4).
 - [ ] Problem exists. Something is incorrect or broken (complete 3-7).
