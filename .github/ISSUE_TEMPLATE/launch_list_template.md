@@ -1,3 +1,11 @@
+---
+name: Launch List
+about: Default launch list issue.
+title: ''
+labels: ''
+assignees: ''
+---
+
 # Launch List #
 
 ## General Setup ##
