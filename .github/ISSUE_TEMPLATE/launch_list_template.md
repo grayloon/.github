@@ -121,7 +121,7 @@ assignees: ''
 
 ## Monitoring ##
 - [ ] Uptime Robot
-- [ ] Rapid 7
+- [ ] Trustwave
 - [ ] Add Platform.sh slack health notification
 - [ ] Add Platform.sh activity script for push events
 
