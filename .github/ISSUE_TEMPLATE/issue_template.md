@@ -24,6 +24,9 @@ assignees: ''
 
 ### 5. Reproducing the Problem
 <!-- Provide the steps necessary to reproduce the problem including URLs, buttons clicked, and other actions: -->
+#### - URL where the issue occurs:
+
+#### - Screenshot:
 
 ### 6. Expected Behavior
 <!-- Provide a clear and concise description of the expected behavior. -->
