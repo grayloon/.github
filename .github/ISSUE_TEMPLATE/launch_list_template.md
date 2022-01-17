@@ -107,6 +107,12 @@ assignees: ''
 - [ ] `.gitignore` unpaid Plugins (automatically installed via Composer)
 - [ ] Set up GitHub Actions for WP Engine Deployments
 
+### Wordpress Post Launch ###
+- [ ] Change home and site URL in database
+- [ ] Set primary domain in WPE
+- [ ] Setup domain redirect
+- [ ] Clear cache in WPE
+
 ## Post Launch ##
 - [ ] Confirm SSL Works and Redirects non-SSL
 - [ ] Confirm www/non-www Redirects Works
