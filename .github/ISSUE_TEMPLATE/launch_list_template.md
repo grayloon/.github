@@ -133,6 +133,7 @@ assignees: ''
 
 ## Final Steps ##
 - [ ] Update GitHub Repo with Topics
+- [ ] Update `composer.json` with [Authors](https://github.com/grayloon/greet-on-repeat-website/blob/main/composer.json#L7)
 - [ ] Finalize README.md
 - [ ] Add Status Badges to README.md
 - [ ] Update GitHub Wiki (if applicable)
