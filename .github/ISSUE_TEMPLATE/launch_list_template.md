@@ -133,6 +133,7 @@ assignees: ''
 
 ## Final Steps ##
 - [ ] Update GitHub Repo with Topics
+- [ ] Update `composer.json` with [Authors](https://getcomposer.org/doc/04-schema.md#authors)
 - [ ] Finalize README.md
 - [ ] Add Status Badges to README.md
 - [ ] Update GitHub Wiki (if applicable)
