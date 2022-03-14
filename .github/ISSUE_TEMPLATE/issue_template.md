@@ -23,7 +23,7 @@ assignees: ''
 <!-- Provide a reference to any estimates or contracts provided for this work. -->
 
 ### 5. Reproducing the Problem
-<!-- Provide the steps in numeric order necessary to reproduce the problem including URLs, buttons clicked, and other actions: -->
+<!-- Provide the steps in numerical order necessary to reproduce the problem including URLs, buttons clicked, and other actions: -->
 #### - URL where the issue occurs:
 
 #### - Screenshot:
