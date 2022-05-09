@@ -57,7 +57,14 @@ assignees: ''
 - [ ] Configure Query and Metadata Cache
 - [ ] Enable HttpCache
 
-### React ###
+### Laravel ###
+- [ ] Configure (and if necessary purchase) license for CMS
+- [ ] Add Laravel Task Runner to cron (if scheduled tasks)
+- [ ] Ensure `APP_ENV` in `.env` is set to `production`
+- [ ] Ensure cache driver is set correctly
+- [ ] Ensure mail driver is set correctly
+- [ ] Review all env variables and ensure they are set correctly (including cache and mail)
+- [ ] Ensure schedule paths to `/home/forge/{site_domain}` are correct (if changing Forge domain)
 
 ## E-Commerce ##
 - [ ] SSL Purchased and Configured
