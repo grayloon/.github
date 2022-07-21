@@ -58,13 +58,12 @@ assignees: ''
 - [ ] Enable HttpCache
 
 ### Laravel ###
-- [ ] Configure (and if necessary purchase) license for CMS
-- [ ] Add Laravel Task Runner to cron (if scheduled tasks)
-- [ ] Ensure `APP_ENV` in `.env` is set to `production`
-- [ ] Ensure cache driver is set correctly
-- [ ] Ensure mail driver is set correctly
-- [ ] Review all env variables and ensure they are set correctly (including cache and mail)
-- [ ] Ensure schedule paths to `/home/forge/{site_domain}` are correct (if changing Forge domain)
+- [ ] Schedule the necessary application tasks
+- [ ] `APP_ENV` in `.env` is set to `production`
+- [ ] Cache driver is set correctly
+- [ ] Mail driver is set correctly
+- [ ] Enable OPCache
+- [ ] Ensure PHP Maximum Upload Size is set appropriately to the application needs
 
 ## E-Commerce ##
 - [ ] SSL Purchased and Configured
@@ -131,6 +130,7 @@ assignees: ''
 - [ ] Site Notifications Going to Correct Accounts
 - [ ] Tag the Release revision in GitHub
 - [ ] Google Search Console (Webmaster Tools) Account
+- [ ] Purchase and configure license key for CMS (depending on framework)
 
 ## Monitoring ##
 - [ ] Uptime Robot
