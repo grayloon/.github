@@ -28,6 +28,7 @@ assignees: ''
 - [ ] Review site in Dark Mode (including Samsung Browser)
 - [ ] Styleguide Created (excluded in robots.txt)
 - [ ] Robots meta tag added (max-snippet:-1, max-image-preview:large, max-video-preview:-1)
+- [ ] Add `theme-color` meta tag to fit the site design
 
 ## Analytics/Tracking ##
 - [ ] Create Google Analytics Account
