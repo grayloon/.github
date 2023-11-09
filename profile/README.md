@@ -25,7 +25,6 @@ We provide a full range of marketing solutions for brands that want to reach the
 - Websites & Ecommerce
 - Content Creation
 - Social Media Marketing
-- Media Influencer Relations
 
 ## Join Our Team
 
