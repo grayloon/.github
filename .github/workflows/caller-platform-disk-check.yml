@@ -7,6 +7,7 @@ on:
 
 jobs:
   disk-check:
+    if: false  # Template only — does not run in this repo. Remove this line in your project repo.
     uses: grayloon/.github/.github/workflows/platform-disk-check.yml@main
     with:
       app_service: app       # default: "app"
