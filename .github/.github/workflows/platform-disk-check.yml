@@ -1,0 +1,160 @@
+name: "Platform disk check (reusable)"
+
+on:
+  workflow_call:
+    inputs:
+      app_service:
+        description: "Platform.sh app service name"
+        type: string
+        default: "app"
+      db_service:
+        description: "Platform.sh DB service name"
+        type: string
+        default: "mysqldb"
+      app_threshold:
+        description: "App disk usage % threshold"
+        type: number
+        default: 80
+      db_threshold:
+        description: "DB disk usage % threshold"
+        type: number
+        default: 75
+    secrets:
+      PLATFORM_CLI_TOKEN:
+        required: true
+      PLATFORM_PROJECT_ID:
+        required: true
+      PLATFORM_ENVIRONMENT:
+        required: true
+      HEARTBEAT_APP_URL:
+        required: false
+      HEARTBEAT_DB_URL:
+        required: false
+      SLACK_WEBHOOK_URL:
+        required: false
+
+jobs:
+  disk-check:
+    runs-on: ubuntu-latest
+    env:
+      PLATFORMSH_CLI_TOKEN: ${{ secrets.PLATFORM_CLI_TOKEN }}
+      PROJECT_ID: ${{ secrets.PLATFORM_PROJECT_ID }}
+      ENVIRONMENT: ${{ secrets.PLATFORM_ENVIRONMENT }}
+
+    steps:
+      - name: Install Platform CLI
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/platformsh/cli/main/installer.sh | bash
+          echo "$HOME/.platformsh/bin" >> "$GITHUB_PATH"
+
+      - name: Verify CLI auth
+        run: platform auth:info
+
+      - name: Fetch app disk usage
+        id: fetch_app
+        env:
+          APP_SERVICE: ${{ inputs.app_service }}
+        run: |
+          set -euo pipefail
+
+          DISK_OUTPUT="$(platform disk -p "$PROJECT_ID" -e "$ENVIRONMENT" -1 --service "$APP_SERVICE")"
+          echo "$DISK_OUTPUT"
+
+          USED_PCT="$(echo "$DISK_OUTPUT" | awk -F'|' -v svc="$APP_SERVICE" '
+            /^\|/ {
+              s=$3; p=$6
+              gsub(/^[ \t]+|[ \t]+$/, "", s)
+              gsub(/^[ \t]+|[ \t]+$/, "", p)
+              gsub(/%/, "", p)
+              if (s == svc && p ~ /^[0-9.]+$/) { print p; exit }
+            }')"
+
+          echo "used_pct=${USED_PCT}" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch DB disk usage
+        id: fetch_db
+        env:
+          DB_SERVICE: ${{ inputs.db_service }}
+        run: |
+          set -euo pipefail
+
+          DISK_OUTPUT="$(platform disk -p "$PROJECT_ID" -e "$ENVIRONMENT" -1 --service "$DB_SERVICE")"
+          echo "$DISK_OUTPUT"
+
+          USED_PCT="$(echo "$DISK_OUTPUT" | awk -F'|' -v svc="$DB_SERVICE" '
+            /^\|/ {
+              s=$3; p=$6
+              gsub(/^[ \t]+|[ \t]+$/, "", s)
+              gsub(/^[ \t]+|[ \t]+$/, "", p)
+              gsub(/%/, "", p)
+              if (s == svc && p ~ /^[0-9.]+$/) { print p; exit }
+            }')"
+
+          echo "used_pct=${USED_PCT}" >> "$GITHUB_OUTPUT"
+
+      - name: Evaluate thresholds + notify
+        env:
+          HEARTBEAT_APP_URL: ${{ secrets.HEARTBEAT_APP_URL }}
+          HEARTBEAT_DB_URL: ${{ secrets.HEARTBEAT_DB_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          APP_SERVICE: ${{ inputs.app_service }}
+          DB_SERVICE: ${{ inputs.db_service }}
+          APP_THRESHOLD: ${{ inputs.app_threshold }}
+          DB_THRESHOLD: ${{ inputs.db_threshold }}
+          APP_USED: ${{ steps.fetch_app.outputs.used_pct }}
+          DB_USED: ${{ steps.fetch_db.outputs.used_pct }}
+        run: |
+          set -euo pipefail
+
+          notify_slack() {
+            if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then
+              echo "SLACK_WEBHOOK_URL is not set; skipping Slack notification"
+              return 0
+            fi
+            curl -fsS -X POST \
+              -H "Content-Type: application/json" \
+              --data "$(jq -n --arg text "$1" '{text: $text}')" \
+              "$SLACK_WEBHOOK_URL"
+          }
+
+          echo "App (${APP_SERVICE}): ${APP_USED:-<empty>}% (threshold ${APP_THRESHOLD}%)"
+          echo "DB  (${DB_SERVICE}):  ${DB_USED:-<empty>}% (threshold ${DB_THRESHOLD}%)"
+
+          if [ -z "${APP_USED:-}" ]; then
+            notify_slack "$(printf '❌ Platform disk check failed for %s/%s: could not parse %s usage' "$PROJECT_ID" "$ENVIRONMENT" "$APP_SERVICE")"
+            exit 1
+          fi
+
+          if [ -z "${DB_USED:-}" ]; then
+            notify_slack "$(printf '❌ Platform disk check failed for %s/%s: could not parse %s usage' "$PROJECT_ID" "$ENVIRONMENT" "$DB_SERVICE")"
+            exit 1
+          fi
+
+          app_ok=1
+          db_ok=1
+
+          if awk -v u="$APP_USED" -v t="$APP_THRESHOLD" 'BEGIN { exit !(u >= t) }'; then
+            echo "⚠ App disk high: ${APP_USED}% >= ${APP_THRESHOLD}%"
+            app_ok=0
+          else
+            echo "✓ App disk healthy"
+            [ -n "${HEARTBEAT_APP_URL:-}" ] && curl -fsS "$HEARTBEAT_APP_URL" >/dev/null || echo "HEARTBEAT_APP_URL not set; skipping"
+          fi
+
+          if awk -v u="$DB_USED" -v t="$DB_THRESHOLD" 'BEGIN { exit !(u >= t) }'; then
+            echo "⚠ DB disk high: ${DB_USED}% >= ${DB_THRESHOLD}%"
+            db_ok=0
+          else
+            echo "✓ DB disk healthy"
+            [ -n "${HEARTBEAT_DB_URL:-}" ] && curl -fsS "$HEARTBEAT_DB_URL" >/dev/null || echo "HEARTBEAT_DB_URL not set; skipping"
+          fi
+
+          if [ "$app_ok" -eq 0 ] || [ "$db_ok" -eq 0 ]; then
+            message="$(printf '⚠️ Platform disk usage warning for %s/%s' "$PROJECT_ID" "$ENVIRONMENT")"
+            [ "$app_ok" -eq 0 ] && message="$(printf '%s\n• %s: %s%% used (threshold %s%%)' "$message" "$APP_SERVICE" "$APP_USED" "$APP_THRESHOLD")"
+            [ "$db_ok" -eq 0 ] && message="$(printf '%s\n• %s: %s%% used (threshold %s%%)' "$message" "$DB_SERVICE" "$DB_USED" "$DB_THRESHOLD")"
+            notify_slack "$message"
+            exit 1
+          fi
+
+          echo "All clear — no Slack alert needed"

@@ -1,0 +1,22 @@
+name: Platform disk check
+
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+
+jobs:
+  disk-check:
+    uses: grayloon/.github/.github/workflows/platform-disk-check.yml@main
+    with:
+      app_service: app       # default: "app"
+      db_service: mysqldb    # default: "mysqldb"
+      app_threshold: 80      # default: 80
+      db_threshold: 75       # default: 75
+    secrets:
+      PLATFORM_CLI_TOKEN: ${{ secrets.PLATFORM_CLI_TOKEN }}
+      PLATFORM_PROJECT_ID: ${{ secrets.PLATFORM_PROJECT_ID }}
+      PLATFORM_ENVIRONMENT: ${{ secrets.PLATFORM_ENVIRONMENT }}
+      HEARTBEAT_APP_URL: ${{ secrets.HEARTBEAT_APP_URL }}
+      HEARTBEAT_DB_URL: ${{ secrets.HEARTBEAT_DB_URL }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
