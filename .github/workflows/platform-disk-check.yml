@@ -43,118 +43,253 @@ jobs:
 
     steps:
       - name: Install Platform CLI
+        shell: bash
         run: |
+          set -euo pipefail
           curl -fsSL https://raw.githubusercontent.com/platformsh/cli/main/installer.sh | bash
           echo "$HOME/.platformsh/bin" >> "$GITHUB_PATH"
 
+      - name: Write shared helpers
+        shell: bash
+        run: |
+          cat > "$HOME/.disk-check-helpers.sh" << 'HELPERS_EOF'
+          retry_cmd() {
+            local attempts="$1"
+            local sleep_seconds="$2"
+            shift 2
+
+            local attempt=1
+            local output
+            while true; do
+              echo "Attempt ${attempt}/${attempts}: $*" >&2
+
+              if output="$("$@" 2>&1)"; then
+                printf '%s\n' "$output"
+                return 0
+              fi
+
+              printf '%s\n' "$output" >&2
+
+              if [ "$attempt" -ge "$attempts" ]; then
+                echo "Command failed after ${attempts} attempts" >&2
+                return 1
+              fi
+
+              echo "Retrying in ${sleep_seconds}s..." >&2
+              sleep "$sleep_seconds"
+              attempt=$((attempt + 1))
+              sleep_seconds=$((sleep_seconds * 2))
+            done
+          }
+
+          parse_used_pct() {
+            local service_name="$1"
+            awk -F'|' -v svc="$service_name" '
+              /^\|/ {
+                s=$3; p=$6
+                gsub(/^[ \t]+|[ \t]+$/, "", s)
+                gsub(/^[ \t]+|[ \t]+$/, "", p)
+                gsub(/%/, "", p)
+                if (s == svc && p ~ /^[0-9.]+$/) { print p; exit }
+              }'
+          }
+          HELPERS_EOF
+
       - name: Verify CLI auth
-        run: platform auth:info
+        id: auth
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          source "$HOME/.disk-check-helpers.sh"
+
+          retry_cmd 4 10 platform auth:info
 
       - name: Fetch app disk usage
         id: fetch_app
+        shell: bash
+        continue-on-error: true
         env:
-          APP_SERVICE: ${{ inputs.app_service }}
+          SERVICE_NAME: ${{ inputs.app_service }}
         run: |
           set -euo pipefail
+          source "$HOME/.disk-check-helpers.sh"
 
-          DISK_OUTPUT="$(platform disk -p "$PROJECT_ID" -e "$ENVIRONMENT" -1 --service "$APP_SERVICE")"
+          DISK_OUTPUT="$(retry_cmd 4 10 platform disk -p "$PROJECT_ID" -e "$ENVIRONMENT" -1 --service "$SERVICE_NAME")"
           echo "$DISK_OUTPUT"
 
-          USED_PCT="$(echo "$DISK_OUTPUT" | awk -F'|' -v svc="$APP_SERVICE" '
-            /^\|/ {
-              s=$3; p=$6
-              gsub(/^[ \t]+|[ \t]+$/, "", s)
-              gsub(/^[ \t]+|[ \t]+$/, "", p)
-              gsub(/%/, "", p)
-              if (s == svc && p ~ /^[0-9.]+$/) { print p; exit }
-            }')"
+          USED_PCT="$(printf '%s\n' "$DISK_OUTPUT" | parse_used_pct "$SERVICE_NAME")"
+
+          if [ -z "${USED_PCT:-}" ]; then
+            echo "Could not parse used_pct for service ${SERVICE_NAME}" >&2
+            exit 1
+          fi
 
           echo "used_pct=${USED_PCT}" >> "$GITHUB_OUTPUT"
 
       - name: Fetch DB disk usage
         id: fetch_db
+        shell: bash
+        continue-on-error: true
         env:
-          DB_SERVICE: ${{ inputs.db_service }}
+          SERVICE_NAME: ${{ inputs.db_service }}
         run: |
           set -euo pipefail
+          source "$HOME/.disk-check-helpers.sh"
 
-          DISK_OUTPUT="$(platform disk -p "$PROJECT_ID" -e "$ENVIRONMENT" -1 --service "$DB_SERVICE")"
+          DISK_OUTPUT="$(retry_cmd 4 10 platform disk -p "$PROJECT_ID" -e "$ENVIRONMENT" -1 --service "$SERVICE_NAME")"
           echo "$DISK_OUTPUT"
 
-          USED_PCT="$(echo "$DISK_OUTPUT" | awk -F'|' -v svc="$DB_SERVICE" '
-            /^\|/ {
-              s=$3; p=$6
-              gsub(/^[ \t]+|[ \t]+$/, "", s)
-              gsub(/^[ \t]+|[ \t]+$/, "", p)
-              gsub(/%/, "", p)
-              if (s == svc && p ~ /^[0-9.]+$/) { print p; exit }
-            }')"
+          USED_PCT="$(printf '%s\n' "$DISK_OUTPUT" | parse_used_pct "$SERVICE_NAME")"
+
+          if [ -z "${USED_PCT:-}" ]; then
+            echo "Could not parse used_pct for service ${SERVICE_NAME}" >&2
+            exit 1
+          fi
 
           echo "used_pct=${USED_PCT}" >> "$GITHUB_OUTPUT"
 
       - name: Evaluate thresholds + notify
+        if: always()
+        shell: bash
         env:
           HEARTBEAT_APP_URL: ${{ secrets.HEARTBEAT_APP_URL }}
           HEARTBEAT_DB_URL: ${{ secrets.HEARTBEAT_DB_URL }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
           APP_SERVICE: ${{ inputs.app_service }}
           DB_SERVICE: ${{ inputs.db_service }}
           APP_THRESHOLD: ${{ inputs.app_threshold }}
           DB_THRESHOLD: ${{ inputs.db_threshold }}
+
+          AUTH_OUTCOME: ${{ steps.auth.outcome }}
+          APP_FETCH_OUTCOME: ${{ steps.fetch_app.outcome }}
+          DB_FETCH_OUTCOME: ${{ steps.fetch_db.outcome }}
+
           APP_USED: ${{ steps.fetch_app.outputs.used_pct }}
           DB_USED: ${{ steps.fetch_db.outputs.used_pct }}
         run: |
           set -euo pipefail
 
           notify_slack() {
+            local message="$1"
+
             if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then
               echo "SLACK_WEBHOOK_URL is not set; skipping Slack notification"
               return 0
             fi
+
             curl -fsS -X POST \
+              --retry 3 \
+              --retry-delay 5 \
+              --max-time 20 \
               -H "Content-Type: application/json" \
-              --data "$(jq -n --arg text "$1" '{text: $text}')" \
+              --data "$(jq -n --arg text "$message" '{text: $text}')" \
               "$SLACK_WEBHOOK_URL"
           }
 
+          send_heartbeat() {
+            local url="$1"
+            local label="$2"
+
+            if [ -z "${url:-}" ]; then
+              echo "${label} heartbeat URL not set; skipping"
+              return 0
+            fi
+
+            curl -fsS \
+              --retry 3 \
+              --retry-delay 5 \
+              --max-time 20 \
+              "$url" >/dev/null
+
+            echo "${label} heartbeat sent"
+          }
+
+          is_ge_threshold() {
+            local used="$1"
+            local threshold="$2"
+            awk -v u="$used" -v t="$threshold" 'BEGIN { exit !(u >= t) }'
+          }
+
+          echo "Auth outcome: ${AUTH_OUTCOME}"
+          echo "App fetch outcome: ${APP_FETCH_OUTCOME}"
+          echo "DB fetch outcome: ${DB_FETCH_OUTCOME}"
           echo "App (${APP_SERVICE}): ${APP_USED:-<empty>}% (threshold ${APP_THRESHOLD}%)"
-          echo "DB  (${DB_SERVICE}):  ${DB_USED:-<empty>}% (threshold ${DB_THRESHOLD}%)"
+          echo "DB  (${DB_SERVICE}): ${DB_USED:-<empty>}% (threshold ${DB_THRESHOLD}%)"
 
-          if [ -z "${APP_USED:-}" ]; then
-            notify_slack "$(printf '❌ Platform disk check failed for %s/%s: could not parse %s usage' "$PROJECT_ID" "$ENVIRONMENT" "$APP_SERVICE")"
-            exit 1
+          had_fetch_error=0
+          had_threshold_breach=0
+          app_healthy=0
+          db_healthy=0
+
+          # ── Transient failures (auth / fetch) ──────────────────────────
+          # Don't Slack-alert — just skip the heartbeat so the uptime
+          # monitor catches sustained outages.
+
+          if [ "${AUTH_OUTCOME}" != "success" ]; then
+            had_fetch_error=1
+            echo "⚠ CLI auth failed (transient) — skipping heartbeats"
           fi
 
-          if [ -z "${DB_USED:-}" ]; then
-            notify_slack "$(printf '❌ Platform disk check failed for %s/%s: could not parse %s usage' "$PROJECT_ID" "$ENVIRONMENT" "$DB_SERVICE")"
-            exit 1
-          fi
-
-          app_ok=1
-          db_ok=1
-
-          if awk -v u="$APP_USED" -v t="$APP_THRESHOLD" 'BEGIN { exit !(u >= t) }'; then
-            echo "⚠ App disk high: ${APP_USED}% >= ${APP_THRESHOLD}%"
-            app_ok=0
+          if [ "${APP_FETCH_OUTCOME}" != "success" ]; then
+            had_fetch_error=1
+            echo "⚠ Could not fetch disk for ${APP_SERVICE} (transient) — skipping APP heartbeat"
           else
+            if is_ge_threshold "$APP_USED" "$APP_THRESHOLD"; then
+              had_threshold_breach=1
+            else
+              app_healthy=1
+            fi
+          fi
+
+          if [ "${DB_FETCH_OUTCOME}" != "success" ]; then
+            had_fetch_error=1
+            echo "⚠ Could not fetch disk for ${DB_SERVICE} (transient) — skipping DB heartbeat"
+          else
+            if is_ge_threshold "$DB_USED" "$DB_THRESHOLD"; then
+              had_threshold_breach=1
+            else
+              db_healthy=1
+            fi
+          fi
+
+          # ── Heartbeats (only when data was fetched + healthy) ──────────
+
+          if [ "$app_healthy" -eq 1 ]; then
             echo "✓ App disk healthy"
-            [ -n "${HEARTBEAT_APP_URL:-}" ] && curl -fsS "$HEARTBEAT_APP_URL" >/dev/null || echo "HEARTBEAT_APP_URL not set; skipping"
+            send_heartbeat "${HEARTBEAT_APP_URL:-}" "APP"
+          elif [ "${APP_FETCH_OUTCOME}" = "success" ]; then
+            echo "⚠ App disk high: ${APP_USED}% >= ${APP_THRESHOLD}%"
           fi
 
-          if awk -v u="$DB_USED" -v t="$DB_THRESHOLD" 'BEGIN { exit !(u >= t) }'; then
-            echo "⚠ DB disk high: ${DB_USED}% >= ${DB_THRESHOLD}%"
-            db_ok=0
-          else
+          if [ "$db_healthy" -eq 1 ]; then
             echo "✓ DB disk healthy"
-            [ -n "${HEARTBEAT_DB_URL:-}" ] && curl -fsS "$HEARTBEAT_DB_URL" >/dev/null || echo "HEARTBEAT_DB_URL not set; skipping"
+            send_heartbeat "${HEARTBEAT_DB_URL:-}" "DB"
+          elif [ "${DB_FETCH_OUTCOME}" = "success" ]; then
+            echo "⚠ DB disk high: ${DB_USED}% >= ${DB_THRESHOLD}%"
           fi
 
-          if [ "$app_ok" -eq 0 ] || [ "$db_ok" -eq 0 ]; then
+          # ── Threshold breaches → Slack + fail ─────────────────────────
+
+          if [ "$had_threshold_breach" -eq 1 ]; then
             message="$(printf '⚠️ Platform disk usage warning for %s/%s' "$PROJECT_ID" "$ENVIRONMENT")"
-            [ "$app_ok" -eq 0 ] && message="$(printf '%s\n• %s: %s%% used (threshold %s%%)' "$message" "$APP_SERVICE" "$APP_USED" "$APP_THRESHOLD")"
-            [ "$db_ok" -eq 0 ] && message="$(printf '%s\n• %s: %s%% used (threshold %s%%)' "$message" "$DB_SERVICE" "$DB_USED" "$DB_THRESHOLD")"
+            if [ "${APP_FETCH_OUTCOME}" = "success" ] && [ "$app_healthy" -eq 0 ]; then
+              message="$(printf '%s\n• %s: %s%% used (threshold %s%%)' "$message" "$APP_SERVICE" "$APP_USED" "$APP_THRESHOLD")"
+            fi
+            if [ "${DB_FETCH_OUTCOME}" = "success" ] && [ "$db_healthy" -eq 0 ]; then
+              message="$(printf '%s\n• %s: %s%% used (threshold %s%%)' "$message" "$DB_SERVICE" "$DB_USED" "$DB_THRESHOLD")"
+            fi
+
             notify_slack "$message"
             exit 1
           fi
 
-          echo "All clear — no Slack alert needed"
+          # ── Transient fetch errors → exit 0 (heartbeat skip is enough) ─
+
+          if [ "$had_fetch_error" -eq 1 ]; then
+            echo "Fetch/auth failed but not a threshold breach — exiting clean (missing heartbeat will alert if sustained)"
+            exit 0
+          fi
+
+          echo "All clear — thresholds healthy and heartbeats sent where configured"
